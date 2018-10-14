@@ -21,10 +21,12 @@ from MNISTModel import MNISTCNN
 from MNISTModel import MNISTMLP
 from MNISTModel import MNISTLR
 
+'''
 from CIFARModel import CIFARCNN
 from CIFARModel import CIFARMLP
 from CIFARModel import LargeNet
 from CIFARModel import SmallNet
+'''
 
 import os.path
 
@@ -33,11 +35,14 @@ import argparse
 parser = argparse.ArgumentParser()
 
 parser.add_argument('modelname')
+parser.add_argument('dataset')
 parser.add_argument('-n', type = int, default = 500)
 parser.add_argument('-Nb', type = int, default = 50)
 parser.add_argument('-Ns', type = int, default = 1024)
 parser.add_argument('-R', type = int, default = 5)
 parser.add_argument('-random', type = int, default = 1)
+parser.add_argument('-p', type = int, default = 2)
+parser.add_argument('-q', type = int, default = 2)
 
 args = parser.parse_args()
 print('Estimating distance for %s' % (args.modelname))
@@ -45,9 +50,9 @@ print('Estimating distance for %s' % (args.modelname))
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Use device %s' % (device))
 
-def sampling(x0, R, Ns):
+def sampling(x0, R, Ns, p = 2):
     '''
-    Sampling Ns points uniformly in the ball B(x0, R)
+    Sampling Ns points uniformly in the ball B_p(x0, R)
     Input: x0 is a tensor
     Output: x is a tensor
     '''
@@ -55,14 +60,13 @@ def sampling(x0, R, Ns):
     # Step one: sampling gaussian data
     x = np.random.standard_normal((Ns, x0.numel()))
     # Step two: normalizing gaussian data
-    x = x / np.linalg.norm(x, ord = 2, axis = 1, keepdims = True) * R
+    x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True) * R
     # Step three: move each points by x0
     x = x + x0.reshape((1, -1))
 
     return torch.tensor(x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3])), dtype = torch.float)
 
-
-def maximum_grad_norm(model, x0, R, c, j, Nb, Ns):
+def maximum_grad_norm(model, x0, R, c, j, Nb, Ns, p = 2, q = 2):
     '''
     Return the maximum gradient norm in a small ball
     '''
@@ -73,7 +77,7 @@ def maximum_grad_norm(model, x0, R, c, j, Nb, Ns):
         
         model.zero_grad()
         
-        x = sampling(x0, R, Ns)
+        x = sampling(x0, R, Ns, p = p)
         assert(x.shape == (Ns, 1, 28, 28) or x.shape == (Ns, 3, 32, 32))
         x = torch.tensor(x, device = device, requires_grad = True)
 
@@ -85,20 +89,22 @@ def maximum_grad_norm(model, x0, R, c, j, Nb, Ns):
         with torch.no_grad():
             grad = x.grad.reshape((Ns, -1))
             assert(grad.shape[1] == 784 or grad.shape[1] == 3 * 32 * 32)
-            grad_norm = torch.norm(grad, p = 2, dim = 1)
+           
+            grad_norm = torch.norm(grad, p = q, dim = 1)
             assert(grad_norm.shape == (Ns, ))
+            
             temp = torch.max(grad_norm) 
             ret = max(ret, temp)    
 
     return ret
 
-def targeted_score(model, x0, R, c, j, delta_f, Nb, Ns):
+def targeted_score(model, x0, R, c, j, delta_f, Nb, Ns, p = 2, q = 2):
     
-    lipschitz = maximum_grad_norm(model, x0, R, c, j, Nb, Ns)
+    lipschitz = maximum_grad_norm(model, x0, R, c, j, Nb, Ns, p = p, q = q)
 
     return min(R, (delta_f / lipschitz).item())
 
-def untargeted_score(model, x0, output, R, Nb, Ns):
+def untargeted_score(model, x0, output, R, Nb, Ns, p = 2, q = 2):
     
     ret = R 
 
@@ -109,59 +115,58 @@ def untargeted_score(model, x0, output, R, Nb, Ns):
         if j == c:
             continue
             
-        temp = targeted_score(model, x0, R, c, j, output[0, c] - output[0, j], Nb, Ns)
+        temp = targeted_score(model, x0, R, c, j, output[0, c] - output[0, j], Nb, Ns, p = p, q = q)
         ret = min(ret, temp)
 
     return ret
- 
 
-if args.modelname == 'MNISTMLP':
+if args.dataset == 'MNIST':
     transform = transforms.Compose([transforms.ToTensor()]) 
     testset = torchvision.datasets.MNIST(root = './Data', train = False, download = True, transform = transform)
-    
+elif args.dataset == 'CIFAR':
+    transform = transforms.Compose([transforms.ToTensor()]) 
+    testset = torchvision.datasets.CIFAR10(root = './Data', train = False, download = True, transform = transform)
+else:
+    assert(0)
+
+if args.modelname == 'MNISTMLP':
     model = MLP()
     model.load_state_dict(torch.load('./Model/MNISTMLP.pt'))
     model.to(device).eval()
     
 elif args.modelname == 'LargeNet':
-    transform = transforms.Compose([transforms.ToTensor()]) 
-    testset = torchvision.datasets.CIFAR10(root = './Data', train = False, download = True, transform = transform)
-    
     model = LargeNet()
     model.load_state_dict(torch.load('./Model/largeNet.pt'))
     model.to(device).eval()
 
 elif args.modelname == 'CIFARMLP':
-    transform = transforms.Compose([transforms.ToTensor()]) 
-    testset = torchvision.datasets.CIFAR10(root = './Data', train = False, download = True, transform = transform)
-    
     model = CIFARMLP()
     model.load_state_dict(torch.load('./Model/cifarMLP.pt'))
     model.to(device).eval()
 
 elif args.modelname == 'SmallNet':
-    transform = transforms.Compose([transforms.ToTensor()]) 
-    testset = torchvision.datasets.CIFAR10(root = './Data', train = False, download = True, transform = transform)
-    
     model = SmallNet()
     model.load_state_dict(torch.load('./Model/smallNet.pt'))
     model.to(device).eval()
 
 else:
-    print('Model not found!')
-    sys.exit(0)
+    assert(0)
 
 R = args.R
 Nb = args.Nb
 Ns = args.Ns
 n_samples = args.n
+p = args.p
+q = args.q
 
 if args.random == 1:
     index = np.random.choice(10000, n_samples)
 elif args.random == 0:
     index = np.arange(10000)
-else:
+elif args.random == 2:
     index = np.genfromtxt('Index.csv', dtype = np.int32)
+else:
+    assert(0)
 
 dist = []
 target = []
@@ -189,7 +194,7 @@ for i in range(n_samples):
     target.append(label)
     prediction.append(c.item())
 
-    dist_x0 = untargeted_score(model = model, x0 = x0, output = output, R = R, Nb = Nb, Ns = Ns)
+    dist_x0 = untargeted_score(model = model, x0 = x0, output = output, R = R, Nb = Nb, Ns = Ns, p = p, q = q)
     dist.append(dist_x0)
 
 np.savetxt('./Output/' + args.modelname + '_EstimatedDistance.csv', dist, fmt = '%f', delimiter = ',')
