@@ -2,7 +2,6 @@
 Some helper functions to train neural networks
 '''
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

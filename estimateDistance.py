@@ -42,13 +42,19 @@ parser.add_argument('-Ns', type = int, default = 1024)
 parser.add_argument('-R', type = int, default = 5)
 parser.add_argument('-random', type = int, default = 1)
 parser.add_argument('-p', type = int, default = 2)
-parser.add_argument('-q', type = int, default = 2)
 
 args = parser.parse_args()
-print('Estimating distance for %s' % (args.modelname))
+#print('Estimating distance for %s' % (args.modelname))
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Use device %s' % (device))
+
+def printArguments(args):
+
+    for arg in vars(args):
+        if arg == 'p' or arg == 'q':
+            continue
+        print('%s = %s' % (arg, getattr(args, arg)), end = ', ')
 
 def sampling(x0, R, Ns, p = 2):
     '''
@@ -129,9 +135,19 @@ elif args.dataset == 'CIFAR':
 else:
     assert(0)
 
-if args.modelname == 'MNISTMLP':
-    model = MLP()
+if args.modelname == 'MNISTCNN':
+    model = MNISTCNN()
+    model.load_state_dict(torch.load('./Model/MNISTCNN.pt'))
+    model.to(device).eval()
+
+elif args.modelname == 'MNISTMLP':
+    model = MNISTMLP()
     model.load_state_dict(torch.load('./Model/MNISTMLP.pt'))
+    model.to(device).eval()
+
+elif args.modelname == 'MNISTLR':
+    model = MNISTLR()
+    model.load_state_dict(torch.load('./Model/MNISTLR.pt'))
     model.to(device).eval()
     
 elif args.modelname == 'LargeNet':
@@ -156,8 +172,13 @@ R = args.R
 Nb = args.Nb
 Ns = args.Ns
 n_samples = args.n
-p = args.p
-q = args.q
+p = args.p if args.p < 1e10 else np.inf
+if p == np.inf:
+    q = 1
+elif p == 1:
+    q = np.inf
+else:
+    q = p / (p - 1)
 
 if args.random == 1:
     index = np.random.choice(10000, n_samples)
@@ -168,6 +189,9 @@ elif args.random == 2:
 else:
     assert(0)
 
+printArguments(args)
+print('p = %s, q = %s' % (p, q))
+
 dist = []
 target = []
 prediction = []
@@ -175,8 +199,6 @@ prediction = []
 for i in range(n_samples):
     
     input, label = testset[index[i]]
-    #label might be a int variable, not a tensor
-    #input, label = input.to(device), label.to(device)
     input, label = input.to(device), label
     
     x0 = input.reshape((1, *tuple(input.shape)))
