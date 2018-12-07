@@ -28,6 +28,8 @@ from CIFARModel import LargeNet
 from CIFARModel import SmallNet
 '''
 
+from utils import load_model_location, dataset_array, printArguments
+
 import os.path
 
 import argparse
@@ -48,13 +50,6 @@ args = parser.parse_args()
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Use device %s' % (device))
-
-def printArguments(args):
-
-    for arg in vars(args):
-        if arg == 'p' or arg == 'q':
-            continue
-        print('%s = %s' % (arg, getattr(args, arg)), end = ', ')
 
 def sampling(x0, R, Ns, p = 2):
     '''
@@ -126,53 +121,19 @@ def untargeted_score(model, x0, output, R, Nb, Ns, p = 2, q = 2):
 
     return ret
 
-if args.dataset == 'MNIST':
-    transform = transforms.Compose([transforms.ToTensor()]) 
-    testset = torchvision.datasets.MNIST(root = './Data', train = False, download = True, transform = transform)
-elif args.dataset == 'CIFAR':
-    transform = transforms.Compose([transforms.ToTensor()]) 
-    testset = torchvision.datasets.CIFAR10(root = './Data', train = False, download = True, transform = transform)
-else:
-    assert(0)
 
-if args.modelname == 'MNISTCNN':
-    model = MNISTCNN()
-    model.load_state_dict(torch.load('./Model/MNISTCNN.pt'))
-    model.to(device).eval()
+_, testset = dataset_array(args.dataset)
 
-elif args.modelname == 'MNISTMLP':
-    model = MNISTMLP()
-    model.load_state_dict(torch.load('./Model/MNISTMLP.pt'))
-    model.to(device).eval()
-
-elif args.modelname == 'MNISTLR':
-    model = MNISTLR()
-    model.load_state_dict(torch.load('./Model/MNISTLR.pt'))
-    model.to(device).eval()
-    
-elif args.modelname == 'LargeNet':
-    model = LargeNet()
-    model.load_state_dict(torch.load('./Model/largeNet.pt'))
-    model.to(device).eval()
-
-elif args.modelname == 'CIFARMLP':
-    model = CIFARMLP()
-    model.load_state_dict(torch.load('./Model/cifarMLP.pt'))
-    model.to(device).eval()
-
-elif args.modelname == 'SmallNet':
-    model = SmallNet()
-    model.load_state_dict(torch.load('./Model/smallNet.pt'))
-    model.to(device).eval()
-
-else:
-    assert(0)
+model, filename = load_model_location(args.modelname)
+model.load_state_dict(torch.load(filename))
+model.to(device).eval()
 
 R = args.R
 Nb = args.Nb
 Ns = args.Ns
 n_samples = args.n
 p = args.p if args.p < 1e10 else np.inf
+
 if p == np.inf:
     q = 1
 elif p == 1:

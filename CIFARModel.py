@@ -1,7 +1,33 @@
+'''
+Define architecture of neural networks on CIFAR.
+'''
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class CIFARLR(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(3 * 32 * 32, 10)
+
+    def forward(self, x):
+        x = x.view(-1, 3 * 32 * 32)
+        x = self.fc(x)
+
+        return x
+
+class CIFARMLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(3 * 32 * 32, 1024)
+        self.fc2 = nn.Linear(1024, 10)
+
+    def forward(self, x):
+        x = x.reshape((x.shape[0], 3 * 32 * 32))
+        x = F.softplus(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
 class CIFARCNN(nn.Module):
     def __init__(self):
@@ -27,26 +53,14 @@ class CIFARCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-class CIFARMLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(3 * 32 * 32, 1024)
-        self.fc2 = nn.Linear(1024, 10)
-
-    def forward(self, x):
-        x = x.reshape((x.shape[0], 3 * 32 * 32))
-        x = F.softplus(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-class CIFARDCNN(nn.Module):
+class CIFARCNN_Dropout(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, 3)
         self.conv2 = nn.Conv2d(64, 64, 3)
         self.conv3 = nn.Conv2d(64, 128, 3)
         self.conv4 = nn.Conv2d(128, 128, 3)
-        self.fc1 = nn.Linear(128 * 5 * 5, 256)
+        self.fc1 = nn.Linear(5 * 5 * 128, 256)
         self.drop1 = nn.Dropout(p = 0.5)
         self.fc2 = nn.Linear(256, 256)
         self.drop2 = nn.Dropout(p = 0.5)
@@ -66,16 +80,3 @@ class CIFARDCNN(nn.Module):
         x = self.drop2(x)
         x = self.fc3(x)
         return x
-
-class CIFARLR(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc = nn.Linear(3 * 32 * 32, 10)
-
-    def forward(self, x):
-        x = x.view(-1, 3 * 32 * 32)
-        x = self.fc(x)
-
-        return x
-
-
