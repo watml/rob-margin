@@ -17,12 +17,10 @@ from utils import *
 import argparse
 import os
 
-from estimateLinearDistance import estimateModelDistance
-
 from MNISTModel import MNISTLR
 from CIFARModel import CIFARLR
 
-def distance2(w, b, x, q = 2):
+def __distance__(w, b, x, q = 2):
     '''
     w is d * 1
     b is 1 * 1
@@ -39,22 +37,27 @@ def distance(W, b, x, q = 2):
     ret is scalar
     '''
 
-    c = np.argmax(np.dot(W, x) + b, axis = 0)
-    #d = x.shape[0]
+    d = x.shape[0]
 
-    ret = 1e10
+    c = np.argmax(np.dot(W, x) + b, axis = 0)
+
+    ret = np.inf
     for i in range(0, 10):
         
         if i == c:
             continue
         
-        temp = distance2(W[i, :].reshape((-1, 1)) - W[c, :].reshape((-1, 1)), b[i, 0] - b[c, 0], x, q = q) 
+        temp = __distance__((W[i, :] - W[c, :]).reshape((d, 1)), b[i, 0] - b[c, 0], x, q = q) 
         ret = min(ret, temp)
         
     return ret
 
-def estimateModelDistance(model, X, q = 2):
-    
+def calculateLinearDistance(model, X, q = 2):
+    '''
+    Take a linear model as input. Output the exact distance to decision boundary.
+    q: We are computing Lp distance. q is the dual of p.
+    '''
+
     W, b = list(model.parameters())
     W = W.detach().numpy()
     b = b.detach().numpy().reshape((10, 1))
@@ -62,8 +65,8 @@ def estimateModelDistance(model, X, q = 2):
     dist = []
 
     for i in range(len(X)):
-        input, label = X[i]
-        x0 = input.reshape((-1, 1))
+        img, label = X[i]
+        x0 = img.reshape((-1, 1))
     
         dist.append(distance(W, b, x0, q = q))
 
@@ -73,7 +76,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('modelname')
     parser.add_argument('dataset')
-    parser.add_argument('-n', type = int, default = 100)
+    #parser.add_argument('-n', type = int, default = 100)
     parser.add_argument('-p', type = int, default = 2)
 
     args = parser.parse_args()
@@ -83,37 +86,19 @@ def main():
     trainingset, testset = makeDataset(args.dataset)
     trainloader, testloader = makeLoader((trainingset, testset), batch_size = 32)
 
-    n_samples = args.n
+    #n_samples = args.n
 
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
 
     optimizer = optim.SGD(model.parameters(), lr = 0.01)
 
-    for i in range(20):
+    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 20, verbose = 2)
         
-        total_loss = 0
-
-        for img, label in trainloader:
-            
-            model.zero_grad()
-
-            output = model(img)
-            loss = F.cross_entropy(output, label)
-            loss.backward()
-
-            optimizer.step()
-            total_loss += loss.item()
-
-        total_loss /= len(trainloader)
-
-        #print('Epoch : %d, Loss : %f' % (i + 1, total_loss))
-        print('Epoch : %d, Loss : %f, Test Acc : %f, Avg Dist : %f' % (i + 1, total_loss, acc(model, device, testloader), estimateModelDistance(model, testset, q = 2)))
-
     '''
     TODO: Compare two estimation methods.
     '''
-    average_dist = calculateDistance(model, testset, q = q)
+    average_dist = calculateLinearDistance(model, [testset[i] for i in range(20)], q = q)
     print(average_dist)
 
 if __name__ == '__main__':

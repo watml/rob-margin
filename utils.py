@@ -1,6 +1,7 @@
 '''
 Some helper functions to train neural networks.
 '''
+import numpy as np
 
 import torch
 #import torch.nn as nn
