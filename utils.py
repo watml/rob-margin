@@ -47,6 +47,8 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
     2 -- Print training loss, training error and test acc
     '''
 
+    # print('Train %s on %s' % (model.__class__.__name__, device))
+
     for i in range(epochs):
         
         total_loss = 0
@@ -152,6 +154,7 @@ def modelname2model(modelname):
         'MNISTMLP': MNISTMLP(), \
         'MNISTCNN': MNISTCNN(), \
         'CIFARLR': CIFARLR(), \
+        'CIFARMLP': CIFARMLP(), \
         'CIFARCNN': CIFARCNN() \
     }
 
@@ -169,7 +172,7 @@ def printArguments(args):
 
     args_dict = vars(args)
 
-    for arg in args.dict:
+    for arg in args_dict:
         print('%s = %s' % (arg, args_dict.get(arg)))
 
 def dual(p):

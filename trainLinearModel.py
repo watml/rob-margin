@@ -20,6 +20,8 @@ import os
 from MNISTModel import MNISTLR
 from CIFARModel import CIFARLR
 
+from estimateLipschitzBound import estimateLipschitzBound
+
 def __distance__(w, b, x, q = 2):
     '''
     w is d * 1
@@ -52,7 +54,7 @@ def distance(W, b, x, q = 2):
         
     return ret
 
-def calculateLinearDistance(model, X, q = 2):
+def calculateLinearDistance(model, dataset, q = 2):
     '''
     Take a linear model as input. Output the exact distance to decision boundary.
     q: We are computing Lp distance. q is the dual of p.
@@ -64,8 +66,8 @@ def calculateLinearDistance(model, X, q = 2):
    
     dist = []
 
-    for i in range(len(X)):
-        img, label = X[i]
+    for i in range(len(dataset)):
+        img, label = dataset[i]
         x0 = img.reshape((-1, 1))
     
         dist.append(distance(W, b, x0, q = q))
@@ -91,15 +93,18 @@ def main():
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
 
-    optimizer = optim.SGD(model.parameters(), lr = 0.01)
+    optimizer = optim.SGD(model.parameters(), lr = 0.005)
 
-    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 20, verbose = 2)
+    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 1, verbose = 2)
         
     '''
     TODO: Compare two estimation methods.
     '''
-    average_dist = calculateLinearDistance(model, [testset[i] for i in range(20)], q = q)
+    average_dist = calculateLinearDistance(model, [testset[i] for i in range(500)], q = q)
     print(average_dist)
+
+    dist_list = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(500)], Nb = 1, Ns = 10, p = p, q = q, R = 5)
+    print(np.mean(dist_list))
 
 if __name__ == '__main__':
     main()
