@@ -100,6 +100,7 @@ def main():
     '''
     TODO: Compare two estimation methods.
     '''
+
     average_dist = calculateLinearDistance(model, [testset[i] for i in range(500)], q = q)
     print(average_dist)
 

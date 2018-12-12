@@ -1,6 +1,7 @@
 '''
 Estimate local lipschitz constant by sampling
 '''
+
 import sys
 
 import numpy as np
@@ -61,8 +62,9 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         with torch.no_grad():
             # grad = x.grad.reshape((Ns, -1))
             grad = x.grad.view((Ns, -1))
+
             assert(grad.shape[1] == 28 * 28 or grad.shape[1] == 3 * 32 * 32)
-           
+
             grad_norm = torch.norm(grad, p = q, dim = 1)
             assert(grad_norm.shape == (Ns, ))
             
@@ -105,12 +107,12 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
         img, label = img.to(device), label.to(device)
         
         # Reshape the imput to a tensor with batch_size = 1
-        x0 = img.reshape((1, *tuple(img.shape)))
+        x0 = img.view((1, *tuple(img.shape)))
         
         with torch.no_grad():
             output = model(x0)
-
-        c = torch.argmax(output, dim = 1)
+            # don't know if it will decrease efficiency putting the following statement outside torch.no_grad()
+            c = torch.argmax(output, dim = 1).item()
 
         # target.append(label)
         # prediction.append(c.item())
