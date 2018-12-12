@@ -23,11 +23,14 @@ from utils import *
 import argparse
 import os
 
-def sampling(x0, R, Ns, p):
+def sampling(device, x0, R, Ns, p):
     '''
     Sampling Ns points uniformly in the ball B_p(x0, R)
     Input: x0 is a tensor
     Output: x is a tensor
+
+    TODO: Change the sampling method. Current sampling is problematic, i.e. not uniform.
+          Move sampling process to GPU to speed up.
     '''
 
     # Step one: sampling gaussian data
@@ -37,7 +40,7 @@ def sampling(x0, R, Ns, p):
     # Step three: move each points by x0
     x = x + x0.reshape((1, -1))
 
-    return torch.tensor(x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3])), dtype = torch.float)
+    return torch.tensor(x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3])), device = device, dtype = torch.float, requires_grad = True)
 
 def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
     '''
@@ -50,9 +53,9 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         
         model.zero_grad()
         
-        x = sampling(x0, R, Ns, p = p)
+        x = sampling(device, x0, R, Ns, p = p)
         assert(x.shape == (Ns, 1, 28, 28) or x.shape == (Ns, 3, 32, 32))
-        x = torch.tensor(x, device = device, requires_grad = True)
+        #x = torch.tensor(x, device = device, requires_grad = True)
 
         output = model(x)
         
@@ -68,7 +71,7 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
             grad_norm = torch.norm(grad, p = q, dim = 1)
             assert(grad_norm.shape == (Ns, ))
             
-            temp = torch.max(grad_norm)
+            temp = torch.max(grad_norm).item()
             ret = max(ret, temp)
 
     return ret
@@ -77,7 +80,7 @@ def targeted_score(model, device, x0, c, j, delta_f, Nb, Ns, p, q, R):
     
     grad_norm = maximum_grad_norm(model = model, device = device, x0 = x0, c = c, j = j, Nb = Nb, Ns = Ns, p = p, q = q, R = R)
 
-    return min(R, (delta_f / grad_norm).item())
+    return min(R, delta_f / grad_norm)
 
 def untargeted_score(model, device, x0, c, output, Nb, Ns, p, q, R):
     
@@ -88,7 +91,7 @@ def untargeted_score(model, device, x0, c, output, Nb, Ns, p, q, R):
         if j == c:
             continue
             
-        temp = targeted_score(model = model, device = device, x0 = x0, c = c, j = j, delta_f = output[0, c] - output[0, j], Nb = Nb, Ns = Ns, p = p, q = q, R = R)
+        temp = targeted_score(model = model, device = device, x0 = x0, c = c, j = j, delta_f = (output[0, c] - output[0, j]).item(), Nb = Nb, Ns = Ns, p = p, q = q, R = R)
         ret = min(ret, temp)
 
     return ret

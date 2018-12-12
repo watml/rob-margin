@@ -79,7 +79,7 @@ def main():
     parser.add_argument('modelname')
     parser.add_argument('dataset')
     #parser.add_argument('-n', type = int, default = 100)
-    parser.add_argument('-p', type = int, default = 2)
+    parser.add_argument('-p', type = int, default = 1)
 
     args = parser.parse_args()
 
@@ -101,10 +101,10 @@ def main():
     TODO: Compare two estimation methods.
     '''
 
-    average_dist = calculateLinearDistance(model, [testset[i] for i in range(500)], q = q)
+    average_dist = calculateLinearDistance(model, [testset[i] for i in range(10)], q = q)
     print(average_dist)
 
-    dist_list = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(500)], Nb = 1, Ns = 10, p = p, q = q, R = 5)
+    dist_list = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(10)], Nb = 10, Ns = 10, p = p, q = q, R = 5)
     print(np.mean(dist_list))
 
 if __name__ == '__main__':
