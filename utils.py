@@ -45,6 +45,8 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
     0 -- Only print training loss
     1 -- Print training loss and training acc
     2 -- Print training loss, training error and test acc
+
+    One should move model to the device before calling this function.
     '''
 
     # print('Train %s on %s' % (model.__class__.__name__, device))
@@ -172,7 +174,7 @@ def printArguments(args):
 
     args_dict = vars(args)
 
-    for arg in args_dict:
+    for arg in printArguments_dict:
         print('%s = %s' % (arg, args_dict.get(arg)))
 
 def dual(p):
