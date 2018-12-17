@@ -29,7 +29,7 @@ def sampling(device, x0, R, Ns, p):
     Input: x0 is a tensor
     Output: x is a tensor
 
-    TODO: Change the sampling method. Current sampling is problematic, i.e. not uniform.
+    TODO: Change the sampling method. Current sampling is problematic, i.e. only uniform on the sphere.
           Move sampling process to GPU to speed up.
     '''
 
@@ -63,7 +63,6 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         g.backward()
         
         with torch.no_grad():
-            # grad = x.grad.reshape((Ns, -1))
             grad = x.grad.view((Ns, -1))
 
             assert(grad.shape[1] == 28 * 28 or grad.shape[1] == 3 * 32 * 32)

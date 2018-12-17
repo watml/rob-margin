@@ -12,6 +12,7 @@ def main():
     parser.add_argument('modelname')
     parser.add_argument('path')
     parser.add_argument('dataset')
+    parser.add_argument('-ckpt', type = int, default = 0)
 
     args = parser.parse_args()
 
@@ -21,11 +22,12 @@ def main():
     _, testloader = makeLoader(args.dataset, batch_size = 1024)
 
     model = modelname2model(args.modelname)
-    
-    if os.path.isfile(args.path) == True:
+
+    if bool(args.ckpt) == False:
         model.load_state_dict(torch.load(args.path))
     else:
-        assert(0)
+        checkpoint = torch.load(args.path)
+        model.load_state_dict(checkpoint['model_state_dict'])
 
     model.eval()
     model.to(device)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python trainModel.py CIFARLR ./Model/CIFARLR.pt CIFAR -batch 32 -epochs 10 -lr 0.01 -verbose 2
+python trainModel.py MNISTLR ./Model/MNISTLR MNIST -batch 32 -epochs 10 -lr 0.01 -verbose 2 -s 1
 
 #python trainModel.py MNISTLR MNIST -augmentation 0 -batch 32 -epochs 10 -lr 0.01 -decay 1.0
 
