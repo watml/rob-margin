@@ -36,7 +36,7 @@ def main():
     model = modelname2model(args.modelname)
     optimizer = optim.SGD(model.parameters(), lr = args.lr, weight_decay = args.decay, momentum = args.momentum, nesterov = bool(args.nesterov))
 
-    if bool(args.s) == 0:
+    if bool(args.ckpt) == 0:
         trainSavedModel(args.path, model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose)
     else:
         if os.path.isdir(args.path) == False:
@@ -56,7 +56,6 @@ def main():
                         'model_state_dict' : model.state_dict(), \
                         'optimizer_state_dict' : optimizer.state_dict(), \
                         }, args.path + '/' + args.modelname + '_' + str(i + 1).zfill(5) + '.tar')
-
 
 if __name__ == '__main__':
     main()

@@ -30,16 +30,35 @@ def sampling(device, x0, R, Ns, p):
     Output: x is a tensor
 
     TODO: Change the sampling method. Current sampling is problematic, i.e. only uniform on the sphere.
-          Move sampling process to GPU to speed up.
+    Move sampling process to GPU to speed up.
     '''
 
+    '''
+    Previous sampling method, which is problematic. Samples are uniformly distributed on the sphere.
     # Step one: sampling gaussian data
     x = np.random.standard_normal((Ns, x0.numel()))
     # Step two: normalizing gaussian data
     x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True) * R
     # Step three: move each points by x0
     x = x + x0.reshape((1, -1))
+    '''
 
+    '''
+    TODO: Add sampling methods for other Lp norm.
+    '''
+    if p == 2:
+        #Step one: generate uniform distribution on sphere
+        x = np.random.standard_normal((Ns, x0.numel()))
+        x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True)
+        #Step two: generate scaling factor
+        z = np.random.uniform(low = 0.0, high = 1.0, size = (Ns, 1))
+        z = z ** (1 / x0.numel())
+        #Step three: move each points by x0
+        x = R * z * x
+        x = x + x0.reshape((1, -1))
+    else:
+        assert(0)
+        
     return torch.tensor(x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3])), device = device, dtype = torch.float, requires_grad = True)
 
 def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
@@ -134,35 +153,35 @@ def main():
     parser.add_argument('-Ns', type = int, default = 1024)
     parser.add_argument('-p', type = int, default = 2)
     parser.add_argument('-R', type = int, default = 5)
+    parser.add_argument('-random', type = int, default = 0)
+    parser.add_argument('-ckpt', type = int, default = 0, help = 'Indicate whether path is a check point or not.')
 
     args = parser.parse_args()
-    #print('Estimating distance for %s' % (args.modelname))
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     _, testset = makeDataset(args.dataset)
 
     model = modelname2model(args.modelname)
-    model.load_state_dict(torch.load(args.path))
+
+    if bool(args.ckpt) == False:
+        model.load_state_dict(torch.load(args.path))
+    else:
+        checkpoint = torch.load(args.path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+
     model.to(device).eval()
 
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
 
-    '''
-    if args.random == 1:
-        index = np.random.choice(10000, n_samples)
-    elif args.random == 0:
-        index = np.arange(10000)
-    elif args.random == 2:
-        index = np.genfromtxt('index.csv', dtype = np.int32)
-    else:
-        assert(0)
-    '''
-
     printArguments(args)
 
     print('Estimate %s on %s' % (args.modelname, device))
+    
+    if args.random == 0:
+        set = [testset]
+
 
     dist = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(1)], Nb = args.Nb, Ns = args.Ns, p = p, q = q, R = args.R)
     
