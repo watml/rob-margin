@@ -23,6 +23,8 @@ from utils import *
 import argparse
 import os
 
+import pickle
+
 def sampling(device, x0, R, Ns, p):
     '''
     Sampling Ns points uniformly in the ball B_p(x0, R)
@@ -120,79 +122,98 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
     '''
 
     dist = []
-    #target = []
-    #prediction = []
+    target = []
+    prediction = []
 
     for i in range(len(dataset)):
+        '''
+        On MNIST, label is a torch tensor with only one element; while on CIFAR, label is an int.
+        Convert it to long tensor explicitly.
+        '''
         img, label = dataset[i]
-        img, label = img.to(device), label.to(device)
-        
+        img, label = img.to(device), torch.tensor(label, device = device, dtype = torch.long)
+
         # Reshape the imput to a tensor with batch_size = 1
         x0 = img.view((1, *tuple(img.shape)))
-        
+
         with torch.no_grad():
             output = model(x0)
             # don't know if it will decrease efficiency putting the following statement outside torch.no_grad()
             c = torch.argmax(output, dim = 1).item()
-
-        # target.append(label)
-        # prediction.append(c.item())
+        
+        target.append(label.item())
+        prediction.append(c)
 
         dist_x0 = untargeted_score(model, device, x0, c, output, Nb = Nb, Ns = Ns, p = p, q = q, R = R)
         dist.append(dist_x0)
 
-    return dist
+    return dist, target, prediction
 
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('modelname')
-    parser.add_argument('path')
+    parser.add_argument('model_path')
+    parser.add_argument('store_path')
     parser.add_argument('dataset')
+    parser.add_argument('-train', type = int, default = 0, help = 'Evaluate on training set or test set.')
+    parser.add_argument('-n', type = int, default = 500, help = 'Number of samples that need to estimate.')
     parser.add_argument('-Nb', type = int, default = 50)
     parser.add_argument('-Ns', type = int, default = 1024)
     parser.add_argument('-p', type = int, default = 2)
     parser.add_argument('-R', type = int, default = 5)
-    parser.add_argument('-random', type = int, default = 0)
-    parser.add_argument('-ckpt', type = int, default = 0, help = 'Indicate whether path is a check point or not.')
+    parser.add_argument('-ckpt', type = int, default = 0, help = 'Indicate whether model path is a check point or not.')
 
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    _, testset = makeDataset(args.dataset)
-
+    # Load the pretrained model.
     model = modelname2model(args.modelname)
-
+    
     if bool(args.ckpt) == False:
-        model.load_state_dict(torch.load(args.path))
+        model.load_state_dict(torch.load(args.model_path))
     else:
-        checkpoint = torch.load(args.path)
+        checkpoint = torch.load(args.model_path)
         model.load_state_dict(checkpoint['model_state_dict'])
 
     model.to(device).eval()
-
+    
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
+    
+    # Prepare the subset that need to estimate. Fix the random seed to make sure the subset is the same every time.
+    trainingset, testset = makeDataset(args.dataset)
+    
+    np.random.seed(0)
+    
+    if bool(args.train) == True:
+        index = np.random.random_choice(len(trainingset), size = args.n, replace = False)
+        subset = [trainingset[i] for i in index]
+    else:
+        index = np.random.choice(len(testset), size = args.n, replace = False)
+        subset = [testset[i] for i in index]
+
+    # Reset the random seed.
+    np.random.seed()
 
     printArguments(args)
-
+    
     print('Estimate %s on %s' % (args.modelname, device))
+
+    dist, target, prediction  = estimateLipschitzBound(model, device, subset, Nb = args.Nb, Ns = args.Ns, p = p, q = q, R = args.R)
     
-    if args.random == 0:
-        set = [testset]
-
-
-    dist = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(1)], Nb = args.Nb, Ns = args.Ns, p = p, q = q, R = args.R)
+    estimation = {'index' : index, \
+                  'target' : target, \
+                  'prediction' : prediction, \
+                  'dist' : dist, \
+                  }
     
-    '''
-    np.savetxt('./output/' + args.modelname + '_estimateddistance.csv', dist, fmt = '%f', delimiter = ',')
-    np.savetxt('./output/' + args.modelname + '_index.csv', index, fmt = '%d', delimiter = ',')
-    np.savetxt('./output/' + args.modelname + '_target.csv', target, fmt = '%d', delimiter = ',')
-    np.savetxt('./output/' + args.modelname + '_prediction.csv', prediction, fmt = '%d', delimiter = ',')
-    '''
-
     print(np.mean(dist))
+    
+    with open(args.store_path, 'wb+') as f:
+        pickle.dump(estimation, f)
+
 
 if __name__ == '__main__':
     main()

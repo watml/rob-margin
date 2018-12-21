@@ -56,9 +56,9 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
         total_loss = 0
         
         for img, label in trainloader:
-	            
+            # label is a tensor, one number for each image        
             img, label = img.to(device), label.to(device)
-
+            
             model.zero_grad()
 
             output = model(img)
@@ -174,7 +174,7 @@ def printArguments(args):
 
     args_dict = vars(args)
 
-    for arg in printArguments_dict:
+    for arg in args_dict:
         print('%s = %s' % (arg, args_dict.get(arg)))
 
 def dual(p):

@@ -79,7 +79,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('modelname')
     parser.add_argument('dataset')
-    #parser.add_argument('-n', type = int, default = 100)
     parser.add_argument('-p', type = int, default = 1)
 
     args = parser.parse_args()
@@ -88,8 +87,6 @@ def main():
 
     trainingset, testset = makeDataset(args.dataset)
     trainloader, testloader = makeLoader((trainingset, testset), batch_size = 32)
-
-    #n_samples = args.n
 
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
@@ -106,7 +103,7 @@ def main():
     '''
     Be cautious about setting the radius parameter R. It should be large enough so that the distances for linear classifiers won't be truncated.
     '''
-    dist_list = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(10)], Nb = 10, Ns = 10, p = p, q = q, R = 100)
+    dist_list, _, _ = estimateLipschitzBound(model, torch.device('cpu'), [testset[i] for i in range(10)], Nb = 10, Ns = 10, p = p, q = q, R = 100)
     print(np.mean(dist_list))
 
 if __name__ == '__main__':
