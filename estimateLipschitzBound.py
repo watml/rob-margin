@@ -80,15 +80,12 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
     Return the maximum gradient norm in a small ball
     '''
     
-    start = time.time()
-
     ret = -np.inf
     
     for i in range(Nb):
         
         model.zero_grad()
         
-        #x = sampling(device, x0, R, Ns, p = p)
         x = torch.zeros((Ns, 3, 32, 32), device = device, dtype = torch.float, requires_grad = True)
         assert(x.shape == (Ns, 1, 28, 28) or x.shape == (Ns, 3, 32, 32))
 
@@ -108,10 +105,6 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
             temp = torch.max(grad_norm)
             
             ret = max(ret, temp)
-            
-
-    end = time.time()
-    print('NN computation time %f' % (end - start))
     
     return ret
 
@@ -236,3 +229,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

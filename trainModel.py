@@ -13,9 +13,9 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('modelname')
-    parser.add_argument('path')
+    parser.add_argument('path', help = 'Examples: ./Model/MNISTLR.pt, ./Model/MNISTLR/')
     parser.add_argument('dataset')
-    parser.add_argument('-augmentation', type = int, default = 0)
+    parser.add_argument('-augmentation', type = int, default = 0, help = 'Deprecated, one should never use it.')
     parser.add_argument('-batch', type = int, default = 64)
     parser.add_argument('-epochs', type = int, default = 1)
     parser.add_argument('-lr', type = float, default = 0.01)
@@ -29,33 +29,33 @@ def main():
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    print('Train %s on %s' % (args.modelname, device))
-
     trainloader, testloader = makeLoader(args.dataset, batch_size = args.batch, augmentation = bool(args.augmentation))
     
     model = modelname2model(args.modelname)
     optimizer = optim.SGD(model.parameters(), lr = args.lr, weight_decay = args.decay, momentum = args.momentum, nesterov = bool(args.nesterov))
 
     if bool(args.ckpt) == 0:
-        trainSavedModel(args.path, model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose)
+        # Save a single model
+        train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose)
+
+        model.to(torch.device('cpu'))
+        torch.save(model.state_dict(), args.path)
     else:
+        # Save all models during training
         if os.path.isdir(args.path) == False:
             os.mkdir(args.path)
 
+        model.to(torch.device('cpu'))
         torch.save({'epoch' : 0, \
+                    'loss' : 0, \
+                    'train_acc' : acc(model, torch.device('cpu'), trainloader), \
+                    'test_acc' : acc(model, torch.device('cpu'), testloader), \
                     'model_state_dict' : model.state_dict(), \
                     'optimizer_state_dict' : optimizer.state_dict(), \
                     }, args.path + '/' + args.modelname + '_' + str(0).zfill(5) + '.tar')
 
-        for i in range(args.epochs):
-            model.to(device)
-            model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = 1, verbose = args.verbose)
-
-            model.to(torch.device('cpu'))
-            torch.save({'epoch' : 0, \
-                        'model_state_dict' : model.state_dict(), \
-                        'optimizer_state_dict' : optimizer.state_dict(), \
-                        }, args.path + '/' + args.modelname + '_' + str(i + 1).zfill(5) + '.tar')
+        model.to(device)
+        model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path)
 
 if __name__ == '__main__':
     main()

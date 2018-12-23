@@ -4,9 +4,6 @@ Some helper functions to train neural networks.
 import numpy as np
 
 import torch
-#import torch.nn as nn
-#import torch.nn.functional as F
-#import torch.optim as optim
 
 import torchvision
 import torchvision.transforms as transforms
@@ -18,11 +15,13 @@ import os
 
 def acc(model, device, loader):
     '''
-    Return the accuracy of a given model, assuming that model is in the eval mode, returning the model in eval mode.
+    Return the accuracy of a given model, returning the model in eval mode on the device.
     '''
 
     correct = 0
     total = 0
+
+    model.to(device).eval()
 
     with torch.no_grad():
         
@@ -37,19 +36,21 @@ def acc(model, device, loader):
     
     return correct / total
 
-def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0):
+def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None):
     '''
-    Train a model, assuming that the model is in train mode, returning the model in train mode.
+    Train a model, returning the model in train mode on the device.
 
     Value of verbose:
     0 -- Only print training loss
     1 -- Print training loss and training acc
     2 -- Print training loss, training error and test acc
 
-    One should move model to the device before calling this function.
+    If ckpt_path != None, then assume verbosr = 2
     '''
 
-    # print('Train %s on %s' % (model.__class__.__name__, device))
+    print('Train %s on %s' % (model.__class__.__name__, device))
+    
+    model.to(device).train()
 
     for i in range(epochs):
         
@@ -70,25 +71,46 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
 
         total_loss /= len(trainloader)
         
+        # Start to evaluate model
         model.eval()
+        
+        if ckpt_folder != None:
+            verbose = 2
         
         if verbose == 0:
             print('Epoch : %d, Loss : %f' % (i + 1, total_loss))
         elif verbose == 1:
-            print('Epoch : %d, Loss : %f, Training Acc : %f' % (i + 1, total_loss, acc(model, device, trainloader)))
+            train_acc = acc(model, device, trainloader)
+            print('Epoch : %d, Loss : %f, Training Acc : %f' % (i + 1, total_loss, train_acc))
         elif verbose == 2:
-            print('Epoch : %d, Loss : %f, Training Acc : %f, Test Acc : %f' % (i + 1, total_loss, acc(model, device, trainloader), acc(model, device, testloader)))
+            train_acc = acc(model, device, trainloader)
+            test_acc = acc(model, device, testloader)
+            print('Epoch : %d, Loss : %f, Training Acc : %f, Test Acc : %f' % (i + 1, total_loss, train_acc, test_acc))
         else:
             assert(0)
 
+        if ckpt_folder != None:
+            checkpoint = {'epochs' : i + 1, \
+                          'loss' : total_loss, \
+                          'train_acc' : train_acc, \
+                          'test_acc' : test_acc, \
+                          'model_state_dict' : model.state_dict(), \
+                          'optmizer_state_dict' : optimizer.state_dict(), \
+                          }
+            torch.save(checkpoint, ckpt_folder + '/' + model.__class__.__name__ + '_' + str(i + 1).zfill(5) + '.tar')
+        
+        # Set model back to train mode for the next epoch
         model.train()
 
     return model
 
+# Deprecated. One should load and save models by self.
 def trainSavedModel(path, model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0):
     '''
     Train a saved model.
     '''
+
+    assert(0)
 
     if os.path.isfile(path) == True:
         model.load_state_dict(torch.load(path))
@@ -109,6 +131,8 @@ def makeDataset(dataset, augmentation = False):
     '''
     Take a string as input and output the dataset.
     '''
+    if augmentation == True:
+        assert(0)
 
     if augmentation == False:
         transform_train = transforms.Compose([transforms.ToTensor()])
