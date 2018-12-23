@@ -86,7 +86,7 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         
         model.zero_grad()
         
-        x = torch.zeros((Ns, 3, 32, 32), device = device, dtype = torch.float, requires_grad = True)
+        x = sampling(device = device, x0 = x0, R = R, Ns = Ns, p = p)
         assert(x.shape == (Ns, 1, 28, 28) or x.shape == (Ns, 3, 32, 32))
 
         output = model(x)
@@ -95,7 +95,6 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         g.backward()
         
         with torch.no_grad():
-            
             grad = x.grad.view((Ns, -1))
             assert(grad.shape[1] == 28 * 28 or grad.shape[1] == 3 * 32 * 32)
 
@@ -110,9 +109,9 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
 
 def targeted_score(model, device, x0, c, j, delta_f, Nb, Ns, p, q, R):
     
-    grad_norm = maximum_grad_norm(model = model, device = device, x0 = x0, c = c, j = j, Nb = Nb, Ns = Ns, p = p, q = q, R = R)
+    Lc = maximum_grad_norm(model = model, device = device, x0 = x0, c = c, j = j, Nb = Nb, Ns = Ns, p = p, q = q, R = R)
 
-    return min(R, delta_f / grad_norm)
+    return min(R, delta_f / Lc)
 
 def untargeted_score(model, device, x0, c, output, Nb, Ns, p, q, R):
     
@@ -133,6 +132,10 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
     To estimate Lipschitz lower bound by sampling.
     '''
 
+    model.to(device).eval()
+
+    print('Estimate %s on %s' % (model.__class__.__name__, device))
+
     dist = []
     target = []
     prediction = []
@@ -142,7 +145,6 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
         On MNIST, label is a torch tensor with only one element; while on CIFAR, label is an int.
         Convert it to long tensor explicitly.
         '''
-
         img, label = dataset[i]
         img, label = img.to(device), torch.tensor(label, device = device, dtype = torch.long)
 
@@ -151,7 +153,6 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
 
         with torch.no_grad():
             output = model(x0)
-            # don't know if it will decrease efficiency putting the following statement outside torch.no_grad()
             c = torch.argmax(output, dim = 1).item()
         
         target.append(label.item())
@@ -189,8 +190,6 @@ def main():
     else:
         checkpoint = torch.load(args.model_path)
         model.load_state_dict(checkpoint['model_state_dict'])
-
-    model.to(device).eval()
     
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
@@ -212,8 +211,6 @@ def main():
 
     printArguments(args)
     
-    print('Estimate %s on %s' % (args.modelname, device))
-
     dist, target, prediction  = estimateLipschitzBound(model, device, subset, Nb = args.Nb, Ns = args.Ns, p = p, q = q, R = args.R)
     
     estimation = {'index' : index, \
@@ -224,8 +221,11 @@ def main():
     
     print(np.mean(dist))
     
+    '''
     with open(args.store_path, 'wb+') as f:
         pickle.dump(estimation, f)
+    '''
+    torch.save(estimation, args.store_path)
 
 if __name__ == '__main__':
     main()

@@ -78,14 +78,14 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
             verbose = 2
         
         if verbose == 0:
-            print('Epoch : %d, Loss : %f' % (i + 1, total_loss))
+            print('Epoch : %d, Loss : %.10f' % (i + 1, total_loss))
         elif verbose == 1:
             train_acc = acc(model, device, trainloader)
-            print('Epoch : %d, Loss : %f, Training Acc : %f' % (i + 1, total_loss, train_acc))
+            print('Epoch : %d, Loss : %.10f, Training Acc : %f' % (i + 1, total_loss, train_acc))
         elif verbose == 2:
             train_acc = acc(model, device, trainloader)
             test_acc = acc(model, device, testloader)
-            print('Epoch : %d, Loss : %f, Training Acc : %f, Test Acc : %f' % (i + 1, total_loss, train_acc, test_acc))
+            print('Epoch : %d, Loss : %.10f, Training Acc : %f, Test Acc : %f' % (i + 1, total_loss, train_acc, test_acc))
         else:
             assert(0)
 
@@ -195,11 +195,15 @@ def printArguments(args):
     '''
     Print every entry of args
     '''
-
+    
+    '''
     args_dict = vars(args)
 
     for arg in args_dict:
         print('%s = %s' % (arg, args_dict.get(arg)))
+    '''
+    
+    print(args)
 
 def dual(p):
     '''

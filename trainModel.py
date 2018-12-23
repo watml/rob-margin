@@ -13,19 +13,21 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('modelname')
-    parser.add_argument('path', help = 'Examples: ./Model/MNISTLR.pt, ./Model/MNISTLR/')
+    parser.add_argument('path', help = 'File name: ./Model/MNISTLR.pt, Folder name: ./Model/MNISTLR/')
     parser.add_argument('dataset')
     parser.add_argument('-augmentation', type = int, default = 0, help = 'Deprecated, one should never use it.')
-    parser.add_argument('-batch', type = int, default = 64)
+    parser.add_argument('-batch', type = int, default = 32)
     parser.add_argument('-epochs', type = int, default = 1)
     parser.add_argument('-lr', type = float, default = 0.01)
-    parser.add_argument('-decay', type = float, default = 0.0)
+    parser.add_argument('-decay', type = float, default = 0.0, help = 'Deprecated, one should never use it.')
     parser.add_argument('-momentum', type = float, default = 0.0)
     parser.add_argument('-nesterov', type = int, default = 0)
     parser.add_argument('-verbose', type = int, default = 2)
     parser.add_argument('-ckpt', type = int, default = 0, help = 'If ckpt == false, then path is a file, otherwise path is a folder, storing all checkpoints during training.')
 
     args = parser.parse_args()
+    
+    printArguments(args)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 

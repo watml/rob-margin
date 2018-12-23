@@ -17,6 +17,7 @@ def main():
     args = parser.parse_args()
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     print('Test %s on %s' % (args.modelname, device))
 
     _, testloader = makeLoader(args.dataset, batch_size = 1024)
@@ -29,8 +30,7 @@ def main():
         checkpoint = torch.load(args.path)
         model.load_state_dict(checkpoint['model_state_dict'])
 
-    model.eval()
-    model.to(device)
+    model.to(device).eval()
 
     print(acc(model, device, testloader))
 
