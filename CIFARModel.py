@@ -29,6 +29,7 @@ class CIFARMLP(nn.Module):
         x = self.fc2(x)
         return x
 
+'''
 class CIFARCNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -52,8 +53,9 @@ class CIFARCNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+'''
 
-class CIFARCNN_Dropout(nn.Module):
+class CIFARCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, 3)
@@ -80,3 +82,4 @@ class CIFARCNN_Dropout(nn.Module):
         x = self.drop2(x)
         x = self.fc3(x)
         return x
+

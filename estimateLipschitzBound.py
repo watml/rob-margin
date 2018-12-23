@@ -7,13 +7,6 @@ import sys
 import numpy as np
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-
-import torchvision
-import torchvision.transforms as transforms
-from torch.utils.data.dataset import Dataset
 
 from MNISTModel import *
 from CIFARModel import *
@@ -25,58 +18,79 @@ import os
 
 import pickle
 
+import time
+
+def l2_samples(device, x0, R, Ns, p):
+    '''
+    Generate samples in a unit ball around origin.
+    '''
+
+    '''    
+    # Previous sampling method using NumPy.
+    # Sampling on CPU then move data to GPU is time consuming.
+    # Step one: generate uniform distribution on sphere
+    x = np.random.standard_normal((Ns, x0.numel()))
+    x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True)
+    # Step two: generate scaling factor
+    z = np.random.uniform(low = 0.0, high = 1.0, size = (Ns, 1))
+    z = z ** (1 / x0.numel())
+    # Step three: move each points by x0
+    x = R * z * x
+    x = x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3]))
+    '''
+
+    # Update: same sampling method using PyTorch
+
+    # Step one: generate uniform distribution on sphere
+    x = torch.randn((Ns, x0.numel()), device = device, dtype = torch.float)
+    x = x / torch.norm(x, p = 2, dim = 1, keepdim = True)
+
+    # Step two: generate scaling factor
+    z = torch.rand((Ns, 1), device = device, dtype = torch.float)
+    z = torch.pow(z, 1 / x0.numel())
+    x = R * z * x
+
+    # Step three: reshape samples
+    x = x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3]))
+
+    return x
+
 def sampling(device, x0, R, Ns, p):
     '''
     Sampling Ns points uniformly in the ball B_p(x0, R)
     Input: x0 is a tensor
     Output: x is a tensor
-
-    TODO: Change the sampling method. Current sampling is problematic, i.e. only uniform on the sphere.
-    Move sampling process to GPU to speed up.
-    '''
-
-    '''
-    Previous sampling method, which is problematic. Samples are uniformly distributed on the sphere.
-    # Step one: sampling gaussian data
-    x = np.random.standard_normal((Ns, x0.numel()))
-    # Step two: normalizing gaussian data
-    x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True) * R
-    # Step three: move each points by x0
-    x = x + x0.reshape((1, -1))
+    
+    Note: one MUST initilize sampling.SAMPLED = False before estimation.
     '''
 
     '''
     TODO: Add sampling methods for other Lp norm.
     '''
-    if p == 2:
-        #Step one: generate uniform distribution on sphere
-        x = np.random.standard_normal((Ns, x0.numel()))
-        x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True)
-        #Step two: generate scaling factor
-        z = np.random.uniform(low = 0.0, high = 1.0, size = (Ns, 1))
-        z = z ** (1 / x0.numel())
-        #Step three: move each points by x0
-        x = R * z * x
-        x = x + x0.reshape((1, -1))
+    
+    if p == 2:        
+        samples = l2_samples(device, x0, R, Ns, p)
     else:
         assert(0)
-        
-    return torch.tensor(x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3])), device = device, dtype = torch.float, requires_grad = True)
+    
+    return torch.tensor(x0 + samples, device = device, dtype = torch.float, requires_grad = True)
 
 def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
     '''
     Return the maximum gradient norm in a small ball
     '''
     
+    start = time.time()
+
     ret = -np.inf
     
     for i in range(Nb):
         
         model.zero_grad()
         
-        x = sampling(device, x0, R, Ns, p = p)
+        #x = sampling(device, x0, R, Ns, p = p)
+        x = torch.zeros((Ns, 3, 32, 32), device = device, dtype = torch.float, requires_grad = True)
         assert(x.shape == (Ns, 1, 28, 28) or x.shape == (Ns, 3, 32, 32))
-        #x = torch.tensor(x, device = device, requires_grad = True)
 
         output = model(x)
         
@@ -84,16 +98,21 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
         g.backward()
         
         with torch.no_grad():
+            
             grad = x.grad.view((Ns, -1))
-
             assert(grad.shape[1] == 28 * 28 or grad.shape[1] == 3 * 32 * 32)
 
             grad_norm = torch.norm(grad, p = q, dim = 1)
             assert(grad_norm.shape == (Ns, ))
             
-            temp = torch.max(grad_norm).item()
+            temp = torch.max(grad_norm)
+            
             ret = max(ret, temp)
+            
 
+    end = time.time()
+    print('NN computation time %f' % (end - start))
+    
     return ret
 
 def targeted_score(model, device, x0, c, j, delta_f, Nb, Ns, p, q, R):
@@ -124,12 +143,13 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
     dist = []
     target = []
     prediction = []
-
+    
     for i in range(len(dataset)):
         '''
         On MNIST, label is a torch tensor with only one element; while on CIFAR, label is an int.
         Convert it to long tensor explicitly.
         '''
+
         img, label = dataset[i]
         img, label = img.to(device), torch.tensor(label, device = device, dtype = torch.long)
 
@@ -143,7 +163,7 @@ def estimateLipschitzBound(model, device, dataset, Nb, Ns, p, q, R):
         
         target.append(label.item())
         prediction.append(c)
-
+        
         dist_x0 = untargeted_score(model, device, x0, c, output, Nb = Nb, Ns = Ns, p = p, q = q, R = R)
         dist.append(dist_x0)
 
@@ -213,7 +233,6 @@ def main():
     
     with open(args.store_path, 'wb+') as f:
         pickle.dump(estimation, f)
-
 
 if __name__ == '__main__':
     main()

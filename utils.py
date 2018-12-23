@@ -188,3 +188,4 @@ def dual(p):
         return np.inf
     else:
         return p / (p - 1)
+
