@@ -217,6 +217,7 @@ def main():
                   'target' : target, \
                   'prediction' : prediction, \
                   'dist' : dist, \
+                  'config' : args, \
                   }
     
     print(np.mean(dist))
