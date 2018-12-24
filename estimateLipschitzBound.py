@@ -60,8 +60,6 @@ def sampling(device, x0, R, Ns, p):
     Sampling Ns points uniformly in the ball B_p(x0, R)
     Input: x0 is a tensor
     Output: x is a tensor
-    
-    Note: one MUST initilize sampling.SAMPLED = False before estimation.
     '''
 
     '''
@@ -101,7 +99,7 @@ def maximum_grad_norm(model, device, x0, c, j, Nb, Ns, p, q, R):
             grad_norm = torch.norm(grad, p = q, dim = 1)
             assert(grad_norm.shape == (Ns, ))
             
-            temp = torch.max(grad_norm)
+            temp = torch.max(grad_norm).item()
             
             ret = max(ret, temp)
     
@@ -222,10 +220,6 @@ def main():
     
     print(np.mean(dist))
     
-    '''
-    with open(args.store_path, 'wb+') as f:
-        pickle.dump(estimation, f)
-    '''
     torch.save(estimation, args.store_path)
 
 if __name__ == '__main__':
