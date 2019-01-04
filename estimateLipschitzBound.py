@@ -198,7 +198,7 @@ def main():
     np.random.seed(0)
     
     if bool(args.train) == True:
-        index = np.random.random_choice(len(trainingset), size = args.n, replace = False)
+        index = np.random.choice(len(trainingset), size = args.n, replace = False)
         subset = [trainingset[i] for i in index]
     else:
         index = np.random.choice(len(testset), size = args.n, replace = False)

@@ -93,9 +93,9 @@ def main():
 
     print('p = %f, q = %f' % (p, q))
 
-    optimizer = optim.SGD(model.parameters(), lr = 0.005)
+    optimizer = optim.SGD(model.parameters(), lr = 0.01, momentum = 0.9, nesterov = True)
 
-    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 1, verbose = 2)
+    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 20, verbose = 2)
      
     average_dist = calculateLinearDistance(model, [testset[i] for i in range(10)], q = q)
     print(average_dist)

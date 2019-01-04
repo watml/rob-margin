@@ -38,20 +38,20 @@ def main():
 
     if bool(args.ckpt) == 0:
         # Save a single model
+        model.to(device)
         train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose)
 
-        model.to(torch.device('cpu'))
         torch.save(model.state_dict(), args.path)
     else:
         # Save all models during training
         if os.path.isdir(args.path) == False:
             os.mkdir(args.path)
 
-        model.to(torch.device('cpu'))
+        model.to(device)
         torch.save({'epoch' : 0, \
                     'loss' : 0, \
-                    'train_acc' : acc(model, torch.device('cpu'), trainloader), \
-                    'test_acc' : acc(model, torch.device('cpu'), testloader), \
+                    'train_acc' : acc(model, device, trainloader), \
+                    'test_acc' : acc(model, device, testloader), \
                     'model_state_dict' : model.state_dict(), \
                     'optimizer_state_dict' : optimizer.state_dict(), \
                     }, args.path + '/' + args.modelname + '_' + str(0).zfill(5) + '.tar')
