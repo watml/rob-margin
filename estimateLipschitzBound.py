@@ -3,20 +3,13 @@ Estimate local lipschitz constant by sampling
 '''
 
 import sys
-
 import numpy as np
-
 import torch
-
 from Model import *
-
 from utils import *
-
 import argparse
 import os
-
 import pickle
-
 import time
 
 def l2_samples(device, x0, R, Ns, p):
