@@ -17,43 +17,10 @@ from utils import *
 import argparse
 import os
 
-from MNISTModel import MNISTLR
-from CIFARModel import CIFARLR
+from Model import MNISTLR
+from Model import CIFARLR
 
 from estimateLipschitzBound import estimateLipschitzBound
-
-def __distance__(w, b, x, q):
-    '''
-    Evaluate the distance for a single data point.
-    w is d * 1
-    b is 1 * 1
-    x is d * 1
-    '''
-    return np.abs(np.dot(w.T, x) + b) / np.linalg.norm(w.squeeze(), ord = q)
-    
-def distance(W, b, x, q):
-    '''
-    W is 10 * d
-    b is 10 * 1
-    x is d * 1
-    
-    ret is scalar
-    '''
-
-    d = x.shape[0]
-
-    c = np.argmax(np.dot(W, x) + b, axis = 0)
-
-    ret = np.inf
-    for i in range(0, 10):
-        
-        if i == c:
-            continue
-        
-        temp = __distance__((W[i, :] - W[c, :]).reshape((d, 1)), b[i, 0] - b[c, 0], x, q = q) 
-        ret = min(ret, temp)
-        
-    return ret
 
 def calculateLinearDistance(model, dataset, q):
     '''
@@ -63,6 +30,7 @@ def calculateLinearDistance(model, dataset, q):
 
     W, b = list(model.parameters())
     W = W.detach().numpy()
+    W = W
     b = b.detach().numpy().reshape((10, 1))
    
     dist = []
@@ -95,7 +63,7 @@ def main():
 
     optimizer = optim.SGD(model.parameters(), lr = 0.01, momentum = 0.9, nesterov = True)
 
-    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 20, verbose = 2)
+    train(model, torch.device('cpu'), trainloader, testloader, F.cross_entropy, optimizer, epochs = 1, verbose = 2)
      
     average_dist = calculateLinearDistance(model, [testset[i] for i in range(10)], q = q)
     print(average_dist)

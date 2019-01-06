@@ -8,8 +8,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-from MNISTModel import *
-from CIFARModel import *
+from Model import *
 
 import os
 
@@ -209,11 +208,43 @@ def dual(p):
     '''
     Return the number of dual norm of p.
     '''
-
     if p == np.inf:
         return 1
     elif p == 1:
         return np.inf
     else:
         return p / (p - 1)
+
+def __distance__(w, b, x, q):
+    '''
+    Calculate the distance for a single data point.
+    w is d * 1
+    b is 1 * 1
+    x is d * 1
+    '''
+    return np.abs(np.dot(w.T, x) + b) / np.linalg.norm(w.squeeze(), ord = q)
+
+def distance(W, b, x, q):
+    '''
+    Calculate the distance for a multiclass linear classifier.
+    W is K * d, where K >= 2
+    b is K * 1
+    x is d * 1
+
+    ret is scalar
+    '''
+    K, d = W.shape
+    assert(x.shape == (d, 1))
+    assert(b.shape == (K, 1))
+
+    c = np.argmax(np.dot(W, x) + b)
+    
+    ret = np.inf
+    for i in range(0, K):
+        if i == c:
+            continue
+        temp = __distance__((W[i, :] - W[c, :]).reshape((d, 1)), b[i, 0] - b[c, 0], x, q = q)
+        ret = min(ret, temp)
+
+    return ret
 

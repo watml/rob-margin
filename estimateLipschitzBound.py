@@ -8,8 +8,7 @@ import numpy as np
 
 import torch
 
-from MNISTModel import *
-from CIFARModel import *
+from Model import *
 
 from utils import *
 
