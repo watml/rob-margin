@@ -7,12 +7,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+'''
+Too helper functions for normalizing fc layers and conv layers
+'''
 def normalize_fc(fc, p = 2):
     weight = fc.weight.to(torch.device('cpu')).detach().numpy()
     bias = fc.bias.to(torch.device('cpu')).detach().numpy()
 
     norm = np.linalg.norm(weight, ord = p)
-
+    norm = np.float(norm) # convert to float rather than np.float32 to avoid type error
+    
     fc.weight /= norm
     fc.bias /= norm
 
@@ -21,7 +25,8 @@ def normalize_conv(conv, p = 2):
     bias = conv.bias.to(torch.device('cpu')).detach().numpy()
 
     norm = np.linalg.norm(weight.reshape((weight.shape[0], -1)), ord = p)
-
+    norm = np.float(norm)
+    
     conv.weight /= norm
     conv.bias /= norm
 
@@ -45,12 +50,23 @@ class MNISTMLP(nn.Module):
         self.fc1 = nn.Linear(784, 1024)
         self.fc2 = nn.Linear(1024, 10)
 
-    def forward(self, x):
+    def __forward__(self, x):
         x = x.view((-1, 784))
         x = F.softplus(self.fc1(x))
-        self.feature = x
+        return x
+    
+    def forward(self, x):
+        x = self.__forward__(x)
         x = self.fc2(x)
         return x
+
+    def normalize(self):
+        normalize_fc(self.fc1)
+        normalize_fc(self.fc2)
+
+    def getFinalLayer(self):
+        return self.fc2.weight.to(torch.device('cpu')).detach().numpy(), \
+               self.fc2.bias.to(torch.device('cpu')).detach().numpy()
 
 class MNISTCNN(nn.Module):
     def __init__(self):
@@ -80,7 +96,7 @@ class MNISTCNN(nn.Module):
         x = self.fc3(x)
         return x
 
-    def normalize(self, x):
+    def normalize(self):
         normalize_conv(self.conv1)
         normalize_conv(self.conv2)
         normalize_conv(self.conv3)
@@ -89,6 +105,11 @@ class MNISTCNN(nn.Module):
         normalize_fc(self.fc1)
         normalize_fc(self.fc2)
         normalize_fc(self.fc3)
+
+    def getFinalLayer(self):
+        return self.fc3.weight.to(torch.device('cpu')).detach().numpy(), \
+               self.fc3.bias.to(torch.device('cpu')).detach().numpy()
+        
 
 class CIFARLR(nn.Module):
     def __init__(self):
@@ -143,18 +164,22 @@ class CIFARCNN(nn.Module):
         x = self.drop2(x)
         return x
 
-    def forward(serlf, x):
+    def forward(self, x):
         x = self.__forward__(x)
         x = self.fc3(x)
         return x
 
-    def normalize(self, x):
+    def normalize(self):
         normalize_conv(self.conv1)
         normalize_conv(self.conv2)
         normalize_conv(self.conv3)
         normalize_conv(self.conv4)
-
+        
         normalize_fc(self.fc1)
         normalize_fc(self.fc2)
         normalize_fc(self.fc3)
+
+    def getFinalLayer(self):
+        return self.fc3.weight.to(torch.device('cpu')).detach().numpy(), \
+               self.fc3.bias.to(torch.device('cpu')).detach().numpy()
 
