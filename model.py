@@ -52,7 +52,8 @@ class MNISTMLP(nn.Module):
 
     def __forward__(self, x):
         x = x.view((-1, 784))
-        x = F.softplus(self.fc1(x))
+        #x = F.softplus(self.fc1(x))
+        x = F.relu(self.fc1(x))
         return x
     
     def forward(self, x):
@@ -131,11 +132,24 @@ class CIFARMLP(nn.Module):
         self.fc1 = nn.Linear(3 * 32 * 32, 1024)
         self.fc2 = nn.Linear(1024, 10)
 
-    def forward(self, x):
+    def __forward__(self, x):
         x = x.view((-1, 3 * 32 * 32))
-        x = F.softplus(self.fc1(x))
+        #x = F.softplus(self.fc1(x))
+        x = F.relu(self.fc1(x))
+        return x
+
+    def forward(self, x):
+        x = self.__forward__(x)
         x = self.fc2(x)
         return x
+
+    def normalize(self):
+        normalize_fc(self.fc1)
+        normalize_fc(self.fc2)
+
+    def getFinalLayer(self):
+        return self.fc2.weight.to(torch.device('cpu')).detach().numpy(), \
+               self.fc2.bias.to(torch.device('cpu')).detach().numpy()
 
 class CIFARCNN(nn.Module):
     def __init__(self):

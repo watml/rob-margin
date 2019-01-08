@@ -17,8 +17,8 @@ from utils import *
 import argparse
 import os
 
-from Model import MNISTLR
-from Model import CIFARLR
+from model import MNISTLR
+from model import CIFARLR
 
 from estimateLipschitzBound import estimateLipschitzBound
 

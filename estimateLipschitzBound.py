@@ -5,7 +5,7 @@ Estimate local lipschitz constant by sampling
 import sys
 import numpy as np
 import torch
-from Model import *
+from model import *
 from utils import *
 import argparse
 import os

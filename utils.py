@@ -8,7 +8,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-from Model import *
+from model import *
 
 import os
 
