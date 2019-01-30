@@ -52,13 +52,12 @@ def calculateFeatureSpaceDistance(model, device, dataset, q):
 
     return dist, target, prediction
 
-
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('modelname')
     parser.add_argument('model_path')
-    #parser.add_argument('store_path')
+    parser.add_argument('store_path')
     parser.add_argument('dataset')
 
     parser.add_argument('-train', type = int, default = 0, help = 'Evaluate on training set or test set.')
@@ -101,18 +100,16 @@ def main():
     
     dist, target, prediction = calculateFeatureSpaceDistance(model, device, subset, q)
     
-    '''
     estimation = {'index' : index, \
                   'target' : target, \
                   'prediction' : prediction, \
                   'dist' : dist, \
                   'config' : args, \
                   }
-    '''
 
     print(np.mean(dist))
     
-    #torch.save(estimation, args.store_path)
+    torch.save(estimation, args.store_path)
 
 if __name__ == '__main__':
     main()

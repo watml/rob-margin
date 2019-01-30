@@ -8,19 +8,38 @@ import torch.nn.functional as F
 import numpy as np
 
 '''
-Too helper functions for normalizing fc layers and conv layers
+Helper functions returning orthogonal constraint
 '''
-def normalize_fc(fc, p = 2):
-    weight = fc.weight.to(torch.device('cpu')).detach().numpy()
-    bias = fc.bias.to(torch.device('cpu')).detach().numpy()
 
-    norm = np.linalg.norm(weight, ord = p)
-    norm = np.float(norm) # convert to float rather than np.float32 to avoid type error
+'''
+def orthogonal_constraint_fc(fc, beta):
+    weight = fc.weight
+    return beta * torch.sum(torch.pow(weight.mm(weight.t()) - torch.eye(weight.shape[0], dtype = torch.float, device = weight.device), 2))
+'''
+
+def orthogonal_constraint(model, device, beta):
+    ret = 0
+    for name, p in model.named_parameters():
+        # fully connected layer
+        if 'fc' in name and 'weight' in name:
+            ret += beta * (torch.mm(p, p.t()) - torch.eye(p.shape[0], dtype = torch.float, device = device)).pow(2).sum()
+        elif 'conv' in name and 'weight' in name:
+            assert(0)
     
-    fc.weight /= norm
-    fc.bias /= norm
+    return ret
 
-def normalize_conv(conv, p = 2):
+'''
+Two helper functions for normalizing fc layers and conv layers
+'''
+
+'''
+def normalize_fc(fc, C):
+    norm = torch.norm(fc.weight)
+    if norm > C:
+        fc.weight /= (norm / C)
+
+def normalize_conv(conv, C):
+    assert(0)
     weight = conv.weight.to(torch.device('cpu')).detach().numpy()
     bias = conv.bias.to(torch.device('cpu')).detach().numpy()
 
@@ -29,6 +48,7 @@ def normalize_conv(conv, p = 2):
     
     conv.weight /= norm
     conv.bias /= norm
+'''
 
 '''
 MNIST Models
@@ -37,11 +57,16 @@ class MNISTLR(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc = nn.Linear(784, 10)
-
+    
     def forward(self, x):
         x = x.view(-1, 784)
         x = self.fc(x)
         return x
+    
+    ''' 
+    def normalize(self, C = 1):
+        normalize_fc(self.fc, C = C)
+    '''
 
 class MNISTMLP(nn.Module):
     def __init__(self):
@@ -49,18 +74,21 @@ class MNISTMLP(nn.Module):
         self.feature = None
         self.fc1 = nn.Linear(784, 1024)
         self.fc2 = nn.Linear(1024, 10)
-
+    
+    '''
     def __forward__(self, x):
         x = x.view((-1, 784))
-        #x = F.softplus(self.fc1(x))
         x = F.relu(self.fc1(x))
         return x
-    
+    '''
+
     def forward(self, x):
-        x = self.__forward__(x)
+        x = x.view((-1, 784))
+        x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-
+    
+    '''
     def normalize(self):
         normalize_fc(self.fc1)
         normalize_fc(self.fc2)
@@ -68,35 +96,40 @@ class MNISTMLP(nn.Module):
     def getFinalLayer(self):
         return self.fc2.weight.to(torch.device('cpu')).detach().numpy(), \
                self.fc2.bias.to(torch.device('cpu')).detach().numpy()
+    '''
 
 class MNISTCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 32, 3)
         self.conv2 = nn.Conv2d(32, 32, 3)
-        self.conv3 = nn.Conv2d(32, 64, 3)
-        self.conv4 = nn.Conv2d(64, 64, 3)
-        self.fc1 = nn.Linear(4 * 4 * 64, 200)
-        self.fc2 = nn.Linear(200, 200)
-        self.fc3 = nn.Linear(200, 10)
+        self.fc1 = nn.Linear(12 * 12 * 32, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 10)
     
+    '''
     def __forward__(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.max_pool2d(x, (2, 2))
-        x = F.relu(self.conv3(x))
-        x = F.relu(self.conv4(x))
-        x = F.max_pool2d(x, (2, 2))
-        x = x.view(-1, 4 * 4 * 64)
+        x = x.view(-1, 12 * 12 * 32)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        
         return x
+    '''
 
     def forward(self, x):
-        x = self.__forward__(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, (2, 2))
+        x = x.view(-1, 12 * 12 * 32)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
+    '''
     def normalize(self):
         normalize_conv(self.conv1)
         normalize_conv(self.conv2)
@@ -110,18 +143,22 @@ class MNISTCNN(nn.Module):
     def getFinalLayer(self):
         return self.fc3.weight.to(torch.device('cpu')).detach().numpy(), \
                self.fc3.bias.to(torch.device('cpu')).detach().numpy()
-        
+    '''  
 
 class CIFARLR(nn.Module):
     def __init__(self):
         super().__init__()
+        self.feature = None
         self.fc = nn.Linear(3 * 32 * 32, 10)
 
     def forward(self, x):
         x = x.view(-1, 3 * 32 * 32)
         x = self.fc(x)
-
         return x
+    ''' 
+    def normalize(self):
+        normalize_fc(self.fc)
+    '''
 
 '''
 CIFAR Models
@@ -131,18 +168,22 @@ class CIFARMLP(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(3 * 32 * 32, 1024)
         self.fc2 = nn.Linear(1024, 10)
-
+    
+    '''
     def __forward__(self, x):
         x = x.view((-1, 3 * 32 * 32))
         #x = F.softplus(self.fc1(x))
         x = F.relu(self.fc1(x))
         return x
+    '''
 
     def forward(self, x):
-        x = self.__forward__(x)
+        x = x.view((-1, 3 * 32 * 32))
+        x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-
+    
+    '''
     def normalize(self):
         normalize_fc(self.fc1)
         normalize_fc(self.fc2)
@@ -150,6 +191,7 @@ class CIFARMLP(nn.Module):
     def getFinalLayer(self):
         return self.fc2.weight.to(torch.device('cpu')).detach().numpy(), \
                self.fc2.bias.to(torch.device('cpu')).detach().numpy()
+    '''
 
 class CIFARCNN(nn.Module):
     def __init__(self):
@@ -163,7 +205,8 @@ class CIFARCNN(nn.Module):
         self.fc2 = nn.Linear(256, 256)
         self.drop2 = nn.Dropout(p = 0.5)
         self.fc3 = nn.Linear(256, 10)
-
+    
+    '''
     def __forward__(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
@@ -177,12 +220,24 @@ class CIFARCNN(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.drop2(x)
         return x
+    '''
 
     def forward(self, x):
-        x = self.__forward__(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, (2, 2))
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = F.max_pool2d(x, (2, 2))
+        x = x.view(-1, 5 * 5 * 128)
+        x = F.relu(self.fc1(x))
+        x = self.drop1(x)
+        x = F.relu(self.fc2(x))
+        x = self.drop2(x)
         x = self.fc3(x)
         return x
-
+    
+    '''
     def normalize(self):
         normalize_conv(self.conv1)
         normalize_conv(self.conv2)
@@ -196,4 +251,5 @@ class CIFARCNN(nn.Module):
     def getFinalLayer(self):
         return self.fc3.weight.to(torch.device('cpu')).detach().numpy(), \
                self.fc3.bias.to(torch.device('cpu')).detach().numpy()
+    '''
 

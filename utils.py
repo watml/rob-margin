@@ -35,7 +35,7 @@ def acc(model, device, loader):
     
     return correct / total
 
-def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None):
+def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None, regularizer = False, mu = 1, tau = 1, C = 1, beta = 1):
     '''
     Train a model, returning the model in train mode on the device.
 
@@ -55,21 +55,72 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
         
         total_loss = 0
         
+        # first calculate the gradient of H, then apply sgd to G
+        if regularizer == True:
+
+            total_loss_H = 0
+            
+            for img, label in trainloader:
+                img, label = img.to(device), label.to(device)
+                output = model(img)
+                
+                n_samples = output.shape[0]
+                index = torch.arange(n_samples, device = device)
+                output = output[index, label].reshape((n_samples, 1)) - output
+                output[index, label] = torch.tensor(1e10, device = device)
+                alpha, _ = torch.min(output, dim = 1)
+                # regularizer is H_tau(\alpha) - H_0(\alpha)
+                loss_H = mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), 0 - alpha))
+                loss_H.backward()
+                
+                total_loss_H += loss_H.item()
+            
+            total_loss_H /= len(trainloader)
+
+            # resotre the gradient
+            params_list = list(model.parameters())
+            dH_list = []
+            for tensor in params_list:
+                dH_list.append(torch.tensor(tensor.grad / len(trainloader), device = device))
+
         for img, label in trainloader:
-            # label is a tensor, one number for each image        
+            # label is a tensor, one number for each image
             img, label = img.to(device), label.to(device)
             
             model.zero_grad()
 
             output = model(img)
             loss = loss_fn(output, label)
+            
+            if regularizer == True:
+                n_samples = output.shape[0]
+                index = torch.arange(n_samples, device = device)
+                output = output[index, label].reshape((n_samples, 1)) - output
+                output[index, label] = torch.tensor(1e10, device = device)
+                alpha, _ = torch.min(output, dim = 1)
+                # regularizer is H_tau(\alpha) - H_0(\alpha)
+                loss += mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), tau - alpha))
+                
+                loss += orthogonal_constraint(model, device = device, beta = beta)
+
             loss.backward()
 
+            if regularizer == True:
+                # subtract gradient with dH
+                with torch.no_grad():
+                    params_list = list(model.parameters())
+                    for j in range(len(params_list)):
+                        params_list[j].grad -= dH_list[j]
+            
             optimizer.step()
+            
             total_loss += loss.item()
 
         total_loss /= len(trainloader)
         
+        if regularizer == True:
+            total_loss -= total_loss_H
+
         # Start to evaluate model
         model.eval()
         
@@ -87,7 +138,7 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
             print('Epoch : %d, Loss : %.10f, Training Acc : %f, Test Acc : %f' % (i + 1, total_loss, train_acc, test_acc))
         else:
             assert(0)
-
+        
         if ckpt_folder != None:
             checkpoint = {'epochs' : i + 1, \
                           'loss' : total_loss, \
@@ -96,7 +147,7 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
                           'model_state_dict' : model.state_dict(), \
                           'optmizer_state_dict' : optimizer.state_dict(), \
                           }
-            torch.save(checkpoint, ckpt_folder + '/' + model.__class__.__name__ + '_' + str(i + 1).zfill(5) + '.tar')
+            torch.save(checkpoint, ckpt_folder + '/' + model.__class__.__name__ + '_' + ('' if regularizer == False else 'reg_') + str(i + 1).zfill(5) + '.tar')
         
         # Set model back to train mode for the next epoch
         model.train()

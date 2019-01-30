@@ -24,6 +24,11 @@ def main():
     parser.add_argument('-nesterov', type = int, default = 0)
     parser.add_argument('-verbose', type = int, default = 2)
     parser.add_argument('-ckpt', type = int, default = 0, help = 'If ckpt == false, then path is a file, otherwise path is a folder, storing all checkpoints during training.')
+    parser.add_argument('-reg', type = int, default = 0)
+    parser.add_argument('-mu', type = float, default = 1.0)
+    parser.add_argument('-tau', type = float, default = 1.0)
+    parser.add_argument('-C', type = float, default = 1.0)
+    parser.add_argument('-beta', type = float, default = 1.0)
 
     args = parser.parse_args()
     
@@ -46,7 +51,7 @@ def main():
         # Save all models during training
         if os.path.isdir(args.path) == False:
             os.mkdir(args.path)
-
+            
         model.to(device)
         torch.save({'epoch' : 0, \
                     'loss' : 0, \
@@ -54,10 +59,10 @@ def main():
                     'test_acc' : acc(model, device, testloader), \
                     'model_state_dict' : model.state_dict(), \
                     'optimizer_state_dict' : optimizer.state_dict(), \
-                    }, args.path + '/' + args.modelname + '_' + str(0).zfill(5) + '.tar')
+                    }, args.path + '/' + args.modelname + '_' + ('' if bool(args.reg) == False else 'reg_') + str(0).zfill(5) + '.tar')
 
         model.to(device)
-        model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path)
+        model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path, regularizer = bool(args.reg), mu = args.mu, tau = args.tau, C = args.C, beta = args.beta)
 
 if __name__ == '__main__':
     main()

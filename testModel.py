@@ -23,6 +23,8 @@ def main():
     _, testloader = makeLoader(args.dataset, batch_size = 1024)
 
     model = modelname2model(args.modelname)
+    
+    orthogonal_constraint(model, beta = 1)
 
     if bool(args.ckpt) == False:
         model.load_state_dict(torch.load(args.path))
