@@ -22,10 +22,11 @@ def orthogonal_constraint(model, device, beta):
     for name, p in model.named_parameters():
         # fully connected layer
         if 'fc' in name and 'weight' in name:
-            ret += beta * (torch.mm(p, p.t()) - torch.eye(p.shape[0], dtype = torch.float, device = device)).pow(2).sum()
+            weight = p
+        # convolutional layer
         elif 'conv' in name and 'weight' in name:
-            assert(0)
-    
+            weight = p.view(p.shape[0], -1)
+        ret += beta * (torch.mm(weight, weight.t()) - torch.eye(weight.shape[0], dtype = torch.float, device = device)).pow(2).sum()
     return ret
 
 '''

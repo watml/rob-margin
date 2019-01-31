@@ -27,7 +27,6 @@ def main():
     parser.add_argument('-reg', type = int, default = 0)
     parser.add_argument('-mu', type = float, default = 1.0)
     parser.add_argument('-tau', type = float, default = 1.0)
-    parser.add_argument('-C', type = float, default = 1.0)
     parser.add_argument('-beta', type = float, default = 1.0)
 
     args = parser.parse_args()
@@ -62,7 +61,8 @@ def main():
                     }, args.path + '/' + args.modelname + '_' + ('' if bool(args.reg) == False else 'reg_') + str(0).zfill(5) + '.tar')
 
         model.to(device)
-        model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path, regularizer = bool(args.reg), mu = args.mu, tau = args.tau, C = args.C, beta = args.beta)
+        model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path, regularizer = bool(args.reg), mu = args.mu, tau = args.tau, beta = args.beta)
 
 if __name__ == '__main__':
     main()
+

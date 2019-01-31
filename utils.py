@@ -35,7 +35,7 @@ def acc(model, device, loader):
     
     return correct / total
 
-def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None, regularizer = False, mu = 1, tau = 1, C = 1, beta = 1):
+def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None, regularizer = False, mu = 1, tau = 1, beta = 1):
     '''
     Train a model, returning the model in train mode on the device.
 
