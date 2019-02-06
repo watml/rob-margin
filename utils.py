@@ -16,18 +16,14 @@ def acc(model, device, loader):
     '''
     Return the accuracy of a given model, returning the model in eval mode on the device.
     '''
-
     correct = 0
     total = 0
 
     model.to(device).eval()
 
     with torch.no_grad():
-        
         for img, label in loader:
-            
             img, label = img.to(device), label.to(device)
-            
             output = model(img)
             
             total += label.shape[0]
@@ -203,7 +199,6 @@ def modelname2model(modelname):
     '''
     Given a string, return the corresponding model object.
     '''
-
     modelname_dict = { \
         'MNISTLR': MNISTLR(), \
         'MNISTMLP': MNISTMLP(), \

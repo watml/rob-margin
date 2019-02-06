@@ -70,11 +70,10 @@ CIFAR Models
 class CIFARLR(nn.Module):
     def __init__(self):
         super().__init__()
-        self.feature = None
         self.fc = nn.Linear(3 * 32 * 32, 10)
 
     def forward(self, x):
-        x = x.view(-1, 3 * 32 * 32)
+        x = x.view((-1, 3 * 32 * 32))
         x = self.fc(x)
         return x
 
