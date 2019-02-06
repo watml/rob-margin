@@ -5,6 +5,7 @@ A script to train neural networks.
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+import os
 
 from utils import *
 
@@ -58,7 +59,7 @@ def main():
                     'test_acc' : acc(model, device, testloader), \
                     'model_state_dict' : model.state_dict(), \
                     'optimizer_state_dict' : optimizer.state_dict(), \
-                    }, args.path + '/' + args.modelname + '_' + ('' if bool(args.reg) == False else 'reg_') + str(0).zfill(5) + '.tar')
+                    }, args.path + '/' + args.modelname + '_' + ('' if bool(args.reg) == False and args.beta < 1e-15 else ('reg_' if bool(args.reg) ==  1  else 'constraint_')) + str(0).zfill(5) + '.tar')
 
         model.to(device)
         model = train(model, device, trainloader, testloader, loss_fn = F.cross_entropy, optimizer = optimizer, epochs = args.epochs, verbose = args.verbose, ckpt_folder = args.path, regularizer = bool(args.reg), mu = args.mu, tau = args.tau, beta = args.beta)

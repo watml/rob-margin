@@ -1,5 +1,5 @@
 '''
-A simple experiment for linear classifiers' robustness during training, verifying the implementation of Lipchitz constant estimation.
+A simple experiment for linear classifiers' robustness during training, to verify the implementation of Lipchitz constant estimation.
 '''
 
 import numpy as np

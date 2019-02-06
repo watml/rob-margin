@@ -56,7 +56,7 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
         total_loss = 0
         
         # first calculate the gradient of H, then apply sgd to G
-        if regularizer == True:
+        if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
 
             total_loss_H = 0
             
@@ -99,13 +99,17 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
                 output[index, label] = torch.tensor(1e10, device = device)
                 alpha, _ = torch.min(output, dim = 1)
                 # regularizer is H_tau(\alpha) - H_0(\alpha)
-                loss += mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), tau - alpha))
-                
+                if model.__class__.__name__ != 'CIFARCNN':
+                    loss += mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), tau - alpha))
+                else:
+                    loss += mu * torch.mean(torch.clamp(- alpha, min = 0, max = tau))
+
+            if beta > 0:
                 loss += orthogonal_constraint(model, device = device, beta = beta)
 
             loss.backward()
 
-            if regularizer == True:
+            if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
                 # subtract gradient with dH
                 with torch.no_grad():
                     params_list = list(model.parameters())
@@ -118,7 +122,7 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
 
         total_loss /= len(trainloader)
         
-        if regularizer == True:
+        if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
             total_loss -= total_loss_H
 
         # Start to evaluate model
@@ -147,35 +151,12 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
                           'model_state_dict' : model.state_dict(), \
                           'optmizer_state_dict' : optimizer.state_dict(), \
                           }
-            torch.save(checkpoint, ckpt_folder + '/' + model.__class__.__name__ + '_' + ('' if regularizer == False else 'reg_') + str(i + 1).zfill(5) + '.tar')
+            torch.save(checkpoint, ckpt_folder + '/' + model.__class__.__name__ + '_' + ('' if regularizer == False and beta < 1e-15 else ('reg_' if regularizer == 1 else 'constraint_')) + str(i + 1).zfill(5) + '.tar')
         
         # Set model back to train mode for the next epoch
         model.train()
 
     return model
-
-# Deprecated. One should load and save models by self.
-def trainSavedModel(path, model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0):
-    '''
-    Train a saved model.
-    '''
-
-    assert(0)
-
-    if os.path.isfile(path) == True:
-        model.load_state_dict(torch.load(path))
-    
-    model.to(device)
-    
-    model.train() 
-    train(model, device, trainloader, testloader, loss_fn, optimizer, epochs, verbose)
-    model.eval()
-
-    print('Model Performance : Training Acc : %f, Test Acc : %f' % (acc(model, device, trainloader), acc(model, device, testloader)))
-
-    # Always save model in cpu version
-    model.to(torch.device('cpu'))
-    torch.save(model.state_dict(), path)
 
 def makeDataset(dataset, augmentation = False):
     '''
@@ -245,14 +226,6 @@ def printArguments(args):
     '''
     Print every entry of args
     '''
-    
-    '''
-    args_dict = vars(args)
-
-    for arg in args_dict:
-        print('%s = %s' % (arg, args_dict.get(arg)))
-    '''
-    
     print(args)
 
 def dual(p):

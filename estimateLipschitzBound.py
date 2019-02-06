@@ -17,20 +17,6 @@ def l2_samples(device, x0, R, Ns, p):
     Generate samples in a unit ball around origin.
     '''
 
-    '''    
-    # Previous sampling method using NumPy.
-    # Sampling on CPU then move data to GPU is time consuming.
-    # Step one: generate uniform distribution on sphere
-    x = np.random.standard_normal((Ns, x0.numel()))
-    x = x / np.linalg.norm(x, ord = p, axis = 1, keepdims = True)
-    # Step two: generate scaling factor
-    z = np.random.uniform(low = 0.0, high = 1.0, size = (Ns, 1))
-    z = z ** (1 / x0.numel())
-    # Step three: move each points by x0
-    x = R * z * x
-    x = x.reshape((Ns, x0.shape[1], x0.shape[2], x0.shape[3]))
-    '''
-
     # Update: same sampling method using PyTorch
 
     # Step one: generate uniform distribution on sphere
@@ -52,10 +38,6 @@ def sampling(device, x0, R, Ns, p):
     Sampling Ns points uniformly in the ball B_p(x0, R)
     Input: x0 is a tensor
     Output: x is a tensor
-    '''
-
-    '''
-    TODO: Add sampling methods for other Lp norm.
     '''
     
     if p == 2:        
@@ -169,7 +151,7 @@ def main():
     parser.add_argument('-ckpt', type = int, default = 0, help = 'Indicate whether model path is a check point or not.')
 
     args = parser.parse_args()
-
+    
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # Load the pretrained model.
@@ -178,13 +160,13 @@ def main():
     if bool(args.ckpt) == False:
         model.load_state_dict(torch.load(args.model_path))
     else:
-        checkpoint = torch.load(args.model_path)
+        checkpoint = torch.load(args.model_path, map_location = 'cpu')
         model.load_state_dict(checkpoint['model_state_dict'])
     
     p = args.p if args.p < 1e10 else np.inf
     q = dual(p)
     
-    # Prepare the subset that need to estimate. Fix the random seed to make sure the subset is the same every time.
+    # Prepare the subset that need to estimate. Fix the random seed to make sure the subset is the same every time for fair comparison.
     trainingset, testset = makeDataset(args.dataset)
     
     np.random.seed(0)

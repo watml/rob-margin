@@ -24,12 +24,10 @@ def main():
 
     model = modelname2model(args.modelname)
     
-    orthogonal_constraint(model, beta = 1)
-
     if bool(args.ckpt) == False:
         model.load_state_dict(torch.load(args.path))
     else:
-        checkpoint = torch.load(args.path)
+        checkpoint = torch.load(args.path, map_location = 'cpu')
         model.load_state_dict(checkpoint['model_state_dict'])
 
     model.to(device).eval()
@@ -38,3 +36,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
