@@ -183,7 +183,6 @@ def makeDataset(dataset, augmentation = False):
 
     return trainingset, testset
 
-
 def makeLoader(dataset, batch_size = 64, augmentation = False):
     '''
     Take a dataset as input and output the data loader.
@@ -199,7 +198,6 @@ def makeLoader(dataset, batch_size = 64, augmentation = False):
     testloader = torch.utils.data.DataLoader(testset, batch_size = batch_size, shuffle = False, num_workers = 8)
 
     return trainloader, testloader
-
 
 def modelname2model(modelname):
     '''
