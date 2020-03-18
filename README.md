@@ -1,3 +1,12 @@
-Estimating the robustness of several deep neural networks on MNIST and CIFAR10 datasets.
+# rob-margin
 
-To approximate distances to decision boudaries, we use smapling method to estimate Lipschitz constant bound. The approach is similar to the method proposed in [Evaluating the Robustness of Neural Networks: An Extreme Value Theory Approach](https://openreview.net/forum?id=BkUHlMZ0b). However, we do not perform MLE. Instead, we take the maximum gradient norm directly.
+This repository contains code for "[Understanding Adversarial Robustness: The Trade-off between Minimum and Average Margin][paper]".
+
+[paper]: https://drive.google.com/file/d/1LqPyPmWssBSIhmEeB8e7EcAW6YHPq2kS/view
+
+To run the code, type
+```
+bash estimate.sh
+```
+The script will estimate the average lower bound of the classifier in `./Model/MNISTLR/MNISTLR_01000.tar` and output the result in `./Output` folder.
+
