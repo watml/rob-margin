@@ -4,9 +4,12 @@ Some helper functions to train neural networks.
 import numpy as np
 
 import torch
-
+import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+
+from advertorch.attacks import LinfPGDAttack
+from advertorch.attacks import L2PGDAttack
 
 from model import *
 
@@ -23,7 +26,7 @@ def acc(model, device, loader):
 
     with torch.no_grad():
         for img, label in loader:
-            img, label = img.to(device), label.to(device)
+            img, label = img.to(device), label.long().to(device)
             output = model(img)
             
             total += label.shape[0]
@@ -31,7 +34,33 @@ def acc(model, device, loader):
     
     return correct / total
 
-def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None, regularizer = False, mu = 1, tau = 1, beta = 1):
+def robust_acc(model, device, loader, epsilon = 0.3, nb_iter = 40, step_size = 0.01):
+    '''
+    Return the robust accuracy of a given model.
+    '''
+    correct = 0
+    total = 0
+
+    model.to(device).eval()
+    adversary = L2PGDAttack(model, loss_fn = nn.CrossEntropyLoss(reduction = "sum"), eps = epsilon, \
+                              nb_iter = nb_iter, eps_iter = step_size, rand_init = True, clip_min = 0.0, clip_max = 1.0, \
+                              targeted = False)
+    for cln_data, label in loader:
+        cln_data, label = cln_data.to(device), label.to(device)
+        adv_untargeted = adversary.perturb(cln_data, label)
+        
+        with torch.no_grad():
+            output = model(adv_untargeted)
+            
+        total += label.shape[0]
+        correct += (torch.argmax(output, dim = 1) == label).sum().item()
+    
+    return correct / total
+
+
+def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1, verbose = 0, ckpt_folder = None, \
+          adv = False, epsilon = 0.3, nb_iter = 40, step_size = 0.01, \
+          regularizer = False, mu = 1, tau = 1, beta = 1):
     '''
     Train a model, returning the model in train mode on the device.
 
@@ -50,39 +79,19 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
     for i in range(epochs):
         
         total_loss = 0
-        
-        # first calculate the gradient of H, then apply sgd to G
-        if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
-
-            total_loss_H = 0
-            
-            for img, label in trainloader:
-                img, label = img.to(device), label.to(device)
-                output = model(img)
-                
-                n_samples = output.shape[0]
-                index = torch.arange(n_samples, device = device)
-                output = output[index, label].reshape((n_samples, 1)) - output
-                output[index, label] = torch.tensor(1e10, device = device)
-                alpha, _ = torch.min(output, dim = 1)
-                # regularizer is H_tau(\alpha) - H_0(\alpha)
-                loss_H = mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), 0 - alpha))
-                loss_H.backward()
-                
-                total_loss_H += loss_H.item()
-            
-            total_loss_H /= len(trainloader)
-
-            # resotre the gradient
-            params_list = list(model.parameters())
-            dH_list = []
-            for tensor in params_list:
-                dH_list.append(torch.tensor(tensor.grad / len(trainloader), device = device))
 
         for img, label in trainloader:
             # label is a tensor, one number for each image
             img, label = img.to(device), label.to(device)
             
+            if adv == True:
+                model.eval() 
+                adversary = L2PGDAttack(model, loss_fn = nn.CrossEntropyLoss(reduction = "sum"), eps = epsilon, \
+                                        nb_iter = nb_iter, eps_iter = step_size, rand_init = True, clip_min = 0.0, clip_max = 1.0, \
+                                        targeted = False)
+                img = adversary.perturb(img, label)
+                model.train() 
+
             model.zero_grad()
 
             output = model(img)
@@ -95,32 +104,22 @@ def train(model, device, trainloader, testloader, loss_fn, optimizer, epochs = 1
                 output[index, label] = torch.tensor(1e10, device = device)
                 alpha, _ = torch.min(output, dim = 1)
                 # regularizer is H_tau(\alpha) - H_0(\alpha)
-                if model.__class__.__name__ != 'CIFARCNN':
-                    loss += mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), tau - alpha))
-                else:
-                    loss += mu * torch.mean(torch.clamp(- alpha, min = 0, max = tau))
+                # if model.__class__.__name__ != 'CIFARCNN':
+                #     loss += mu * torch.mean(torch.max(torch.tensor(0, dtype = torch.float, device = device), tau - alpha))
+                # else:
+                loss += mu * torch.mean(torch.clamp(- alpha, min = 0, max = tau))
 
             if beta > 0:
                 loss += orthogonal_constraint(model, device = device, beta = beta)
 
             loss.backward()
 
-            if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
-                # subtract gradient with dH
-                with torch.no_grad():
-                    params_list = list(model.parameters())
-                    for j in range(len(params_list)):
-                        params_list[j].grad -= dH_list[j]
-            
             optimizer.step()
             
             total_loss += loss.item()
 
         total_loss /= len(trainloader)
         
-        if 'CIFAR' not in model.__class__.__name__ and regularizer == True:
-            total_loss -= total_loss_H
-
         # Start to evaluate model
         model.eval()
         
@@ -158,14 +157,15 @@ def makeDataset(dataset, augmentation = False):
     '''
     Take a string as input and output the dataset.
     '''
-    if augmentation == True:
-        assert(0)
+    # if augmentation == True:
+        # assert(0)
 
     if augmentation == False:
         transform_train = transforms.Compose([transforms.ToTensor()])
         transform_test = transforms.Compose([transforms.ToTensor()])
     else:
-        transform_train = transforms.Compose([transforms.RandomCrop(32, padding = 4), transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+        transform_train = transforms.Compose([transforms.RandomCrop(32, padding = 2), transforms.RandomHorizontalFlip(), transforms.ToTensor()])
+        # transform_train = transforms.Compose([transforms.RandomHorizontalFlip(p = 0.5), transforms.ToTensor()])
         transform_test = transforms.Compose([transforms.ToTensor()])
     
     if dataset == 'MNIST':
@@ -205,7 +205,7 @@ def modelname2model(modelname):
         'MNISTCNN': MNISTCNN(), \
         'CIFARLR': CIFARLR(), \
         'CIFARMLP': CIFARMLP(), \
-        'CIFARCNN': CIFARCNN() \
+        'CIFARCNN': CIFARCNN(), \
     }
 
     model = modelname_dict.get(modelname)
@@ -232,14 +232,14 @@ def dual(p):
     else:
         return p / (p - 1)
 
-def __distance__(w, b, x, q):
+def __margin__(w, b, x, q):
     '''
-    Calculate the distance for a single data point.
+    Calculate the margin for a single data point.
     w is d * 1
     b is 1 * 1
     x is d * 1
     '''
-    return np.abs(np.dot(w.T, x) + b) / np.linalg.norm(w.squeeze(), ord = q)
+    return ((np.dot(w.T, x) + b) / np.linalg.norm(w.squeeze(), ord = q)).item()
 
 def distance(W, b, x, q):
     '''
@@ -260,8 +260,29 @@ def distance(W, b, x, q):
     for i in range(0, K):
         if i == c:
             continue
-        temp = __distance__((W[i, :] - W[c, :]).reshape((d, 1)), b[i, 0] - b[c, 0], x, q = q)
+        temp = np.abs(__margin__((W[i, :] - W[c, :]).reshape((d, 1)), b[i, 0] - b[c, 0], x, q = q))
         ret = min(ret, temp)
 
     return ret
 
+def margin(W, b, x, y, q):
+    '''
+    Calculate the margin for a multiclass linear classifier.
+    W is K * d, where K >= 2
+    b is K * 1
+    x is d * 1
+
+    ret is scalar
+    '''
+    K, d = W.shape
+    assert(x.shape == (d, 1))
+    assert(b.shape == (K, 1))
+
+    ret = np.inf
+    for i in range(0, K):
+        if i == y:
+            continue
+        temp = __margin__((W[y, :] - W[i, :]).reshape((d, 1)), b[y, :] - b[i, 0], x, q = q)
+        ret = min(ret, temp)
+    
+    return ret
